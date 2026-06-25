@@ -12,21 +12,23 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install LLVM/Clang (handles -Wextra)
+      # vcpkg ist auf windows-latest vorinstalliert.
+      # Wir installieren OpenBLAS, das demucs.cpp fuer Matrix-Mathematik braucht.
+      - name: Install OpenBLAS via vcpkg
         shell: pwsh
         run: |
-          choco install llvm -y --no-progress
-          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          vcpkg install openblas:x64-windows
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure CMake (Ninja + Clang)
+      - name: Configure CMake
         shell: cmd
         run: |
           mkdir build
           cd build
-          cmake .. -G "Ninja" ^
-            -DCMAKE_BUILD_TYPE=Release ^
-            -DCMAKE_C_COMPILER=clang ^
-            -DCMAKE_CXX_COMPILER=clang++ ^
+          cmake .. ^
+            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DVCPKG_TARGET_TRIPLET=x64-windows ^
+            -DBLA_VENDOR=OpenBLAS ^
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
       - name: Build
@@ -40,6 +42,19 @@ jobs:
         run: |
           Write-Host "=== Suche nach allen .exe und .dll ==="
           Get-ChildItem -Recurse -Include "*.exe","*.dll" | Format-Table FullName, Length
+
+      - name: Copy required DLLs to build dir
+        shell: pwsh
+        working-directory: build
+        run: |
+          $vcpkgBin = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin"
+          if (Test-Path $vcpkgBin) {
+            Write-Host "Kopiere DLLs aus $vcpkgBin"
+            Get-ChildItem -Path $vcpkgBin -Filter "*.dll" | ForEach-Object {
+              Copy-Item $_.FullName -Destination .
+              Write-Host "  kopiert: $($_.Name)"
+            }
+          }
 
       - name: Upload Binary
         uses: actions/upload-artifact@v6
