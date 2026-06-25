@@ -18,7 +18,7 @@ jobs:
           vcpkg install openblas:x64-windows
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure CMake (auto-detect Visual Studio + ClangCL)
+      - name: Configure CMake (auto-detect Visual Studio + ClangCL + Exceptions)
         shell: cmd
         run: |
           mkdir build
@@ -29,6 +29,8 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
             -DVCPKG_TARGET_TRIPLET=x64-windows ^
             -DBLA_VENDOR=OpenBLAS ^
+            -DCMAKE_CXX_FLAGS="/EHsc" ^
+            -DCMAKE_C_FLAGS="/EHsc" ^
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
       - name: Build
