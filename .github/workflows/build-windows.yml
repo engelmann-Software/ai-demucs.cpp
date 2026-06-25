@@ -12,15 +12,25 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Configure CMake (CMake is pre-installed on windows-latest)
+      - name: Install LLVM/Clang (handles -Wextra)
         shell: pwsh
+        run: |
+          choco install llvm -y --no-progress
+          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Configure CMake (Ninja + Clang)
+        shell: cmd
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake .. -G "Ninja" ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCMAKE_C_COMPILER=clang ^
+            -DCMAKE_CXX_COMPILER=clang++ ^
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
       - name: Build
-        shell: pwsh
+        shell: cmd
         working-directory: build
         run: cmake --build . --config Release -j 4
 
