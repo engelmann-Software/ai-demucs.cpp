@@ -30,6 +30,8 @@ if(MSVC)
   add_compile_options(/wd4244 /wd4267 /wd4996 /wd4101 /wd4189)
   # ClangCL beschwert sich uber -O3 das aus VS-Defaults/Submodule kommt
   add_compile_options(-Wno-unused-command-line-argument)
+  # wavpack benutzt _BitScanReverse ohne <intrin.h> - ClangCL ist strenger als MSVC
+  add_compile_options(-Wno-implicit-function-declaration)
 else()
   # Unix/Mac: GCC/Clang-style flags
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
