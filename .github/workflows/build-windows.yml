@@ -1,0 +1,40 @@
+name: build-windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Configure CMake (CMake is pre-installed on windows-latest)
+        shell: pwsh
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+      - name: Build
+        shell: pwsh
+        working-directory: build
+        run: cmake --build . --config Release -j 4
+
+      - name: List Binaries
+        shell: pwsh
+        working-directory: build
+        run: |
+          Write-Host "=== Suche nach allen .exe und .dll ==="
+          Get-ChildItem -Recurse -Include "*.exe","*.dll" | Format-Table FullName, Length
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v6
+        with:
+          name: demucs-cpp-win-x64
+          path: |
+            build/**/*.exe
+            build/**/*.dll
