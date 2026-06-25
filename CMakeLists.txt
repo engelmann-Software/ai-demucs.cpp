@@ -13,10 +13,17 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -DEIGEN_FAST_MATH=0 -O0")
-
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+if(MSVC)
+  # Windows / ClangCL: MSVC-native Flags
+  add_compile_options(/EHsc /W3)
+  set(CMAKE_CXX_FLAGS_DEBUG "/Zi /DEIGEN_FAST_MATH=0 /Od")
+  set(CMAKE_CXX_FLAGS_RELEASE "/O2")
+else()
+  # Unix/Mac: GCC/Clang-style flags
+  set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -DEIGEN_FAST_MATH=0 -O0")
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+endif()
 
 # define a macro NDEBUG for Eigen3 release builds
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG")
