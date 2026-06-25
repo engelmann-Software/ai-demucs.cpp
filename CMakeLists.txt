@@ -13,33 +13,30 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+project(demucs.cpp)
+enable_testing()
+
+# Compiler flags MUESSEN nach project() stehen, sonst werden sie vom
+# Toolchain-Reset bei project() ueberschrieben und propagieren nicht
+# in add_subdirectory().
 if(MSVC)
   # Windows / ClangCL: MSVC-native Flags via CMAKE_CXX_FLAGS
   # (NICHT add_compile_options - das propagiert nicht in add_subdirectory)
-  set(CMAKE_CXX_FLAGS "/EHsc /GR /W3 /D_CRT_SECURE_NO_WARNINGS /DNOMINMAX")
-  set(CMAKE_C_FLAGS   "/W3 /D_CRT_SECURE_NO_WARNINGS")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /GR /W3 /D_CRT_SECURE_NO_WARNINGS /DNOMINMAX")
+  set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} /W3 /D_CRT_SECURE_NO_WARNINGS")
   set(CMAKE_CXX_FLAGS_DEBUG   "/Zi /DEIGEN_FAST_MATH=0 /Od")
-  set(CMAKE_CXX_FLAGS_RELEASE "/O2")
+  set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
   # Haeufige libnyquist-Warnings unterdruecken
   add_compile_options(/wd4244 /wd4267 /wd4996 /wd4101 /wd4189)
-  # ClangCL beschwert sich uber -O3 das von irgendwo (Submodule? VS default?) kommt
+  # ClangCL beschwert sich uber -O3 das aus VS-Defaults/Submodule kommt
   add_compile_options(-Wno-unused-command-line-argument)
 else()
   # Unix/Mac: GCC/Clang-style flags
-  set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
   set(CMAKE_CXX_FLAGS_DEBUG "-g -DEIGEN_FAST_MATH=0 -O0")
-  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 endif()
 
-# define a macro NDEBUG for Eigen3 release builds
-if(MSVC)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /DNDEBUG")
-else()
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG")
-endif()
-
-project(demucs.cpp)
-enable_testing()
 
 # set C++ standard to C++17
 set(CMAKE_CXX_STANDARD 17)
