@@ -14,10 +14,14 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(MSVC)
-  # Windows / ClangCL: MSVC-native Flags
-  add_compile_options(/EHsc /W3)
-  set(CMAKE_CXX_FLAGS_DEBUG "/Zi /DEIGEN_FAST_MATH=0 /Od")
+  # Windows / ClangCL: MSVC-native Flags via CMAKE_CXX_FLAGS
+  # (NICHT add_compile_options - das propagiert nicht in add_subdirectory)
+  set(CMAKE_CXX_FLAGS "/EHsc /GR /W3 /D_CRT_SECURE_NO_WARNINGS /DNOMINMAX")
+  set(CMAKE_C_FLAGS   "/W3 /D_CRT_SECURE_NO_WARNINGS")
+  set(CMAKE_CXX_FLAGS_DEBUG   "/Zi /DEIGEN_FAST_MATH=0 /Od")
   set(CMAKE_CXX_FLAGS_RELEASE "/O2")
+  # Haeufige libnyquist-Warnings unterdruecken
+  add_compile_options(/wd4244 /wd4267 /wd4996 /wd4101 /wd4189)
 else()
   # Unix/Mac: GCC/Clang-style flags
   set(CMAKE_CXX_FLAGS "-Wall -Wextra")
