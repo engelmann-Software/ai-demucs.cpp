@@ -18,12 +18,12 @@ jobs:
           vcpkg install openblas:x64-windows
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure CMake (Visual Studio + ClangCL toolset)
+      - name: Configure CMake (auto-detect Visual Studio + ClangCL)
         shell: cmd
         run: |
           mkdir build
           cd build
-          cmake .. -G "Visual Studio 17 2022" ^
+          cmake .. ^
             -T "ClangCL" ^
             -A x64 ^
             -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
