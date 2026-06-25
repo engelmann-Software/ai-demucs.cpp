@@ -12,20 +12,20 @@ jobs:
         with:
           submodules: recursive
 
-      # vcpkg ist auf windows-latest vorinstalliert.
-      # Wir installieren OpenBLAS, das demucs.cpp fuer Matrix-Mathematik braucht.
       - name: Install OpenBLAS via vcpkg
         shell: pwsh
         run: |
           vcpkg install openblas:x64-windows
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure CMake
+      - name: Configure CMake (Visual Studio + ClangCL toolset)
         shell: cmd
         run: |
           mkdir build
           cd build
-          cmake .. ^
+          cmake .. -G "Visual Studio 17 2022" ^
+            -T "ClangCL" ^
+            -A x64 ^
             -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
             -DVCPKG_TARGET_TRIPLET=x64-windows ^
             -DBLA_VENDOR=OpenBLAS ^
