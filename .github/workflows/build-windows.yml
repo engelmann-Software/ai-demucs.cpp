@@ -4,6 +4,13 @@ on:
   push:
     branches: [main, master]
 
+# Engelmann/MovieJack: liefert demucs-cpp-win-x64.zip mit
+#   demucs-cpp.exe       — Multithread-Treiber (cli-apps/demucs_engelmann.cpp), laeuft auf jeder x64-CPU
+#   demucs-cpp-avx2.exe  — derselbe Treiber mit AVX2/FMA, die App nimmt ihn nur, wenn die CPU es kann
+#   *.dll                — Laufzeit-DLLs aus vcpkg (OpenBLAS)
+# Hochladen nach download.engelmann.com/ai/v1/demucs/bin/ und im Manifest
+# sha256 (ZIP) + exe_sha256 (demucs-cpp.exe) eintragen — siehe Job-Summary.
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -18,48 +25,76 @@ jobs:
           vcpkg install openblas:x64-windows
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Configure CMake (auto-detect Visual Studio + ClangCL + Exceptions)
+      - name: Configure + Build (Basis, jede x64-CPU)
         shell: cmd
         run: |
-          mkdir build
-          cd build
-          cmake .. ^
-            -T "ClangCL" ^
-            -A x64 ^
+          mkdir build-base
+          cd build-base
+          cmake .. -T "ClangCL" -A x64 ^
             -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
             -DVCPKG_TARGET_TRIPLET=x64-windows ^
             -DBLA_VENDOR=OpenBLAS ^
-            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+            -DDEMUCS_AVX2=OFF ^
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" || exit /b 1
+          cmake --build . --config Release --target demucs_engelmann -j 4 || exit /b 1
 
-      - name: Build
+      - name: Configure + Build (AVX2/FMA)
         shell: cmd
-        working-directory: build
-        run: cmake --build . --config Release -j 4
-
-      - name: List Binaries
-        shell: pwsh
-        working-directory: build
         run: |
-          Write-Host "=== Suche nach allen .exe und .dll ==="
-          Get-ChildItem -Recurse -Include "*.exe","*.dll" | Format-Table FullName, Length
+          mkdir build-avx2
+          cd build-avx2
+          cmake .. -T "ClangCL" -A x64 ^
+            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DVCPKG_TARGET_TRIPLET=x64-windows ^
+            -DBLA_VENDOR=OpenBLAS ^
+            -DDEMUCS_AVX2=ON ^
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" || exit /b 1
+          cmake --build . --config Release --target demucs_engelmann -j 4 || exit /b 1
 
-      - name: Copy required DLLs to build dir
+      - name: Paket zusammenstellen
         shell: pwsh
-        working-directory: build
         run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $base = Get-ChildItem build-base -Recurse -Filter demucs_engelmann.exe | Select-Object -First 1
+          $avx2 = Get-ChildItem build-avx2 -Recurse -Filter demucs_engelmann.exe | Select-Object -First 1
+          if (-not $base -or -not $avx2) { throw "demucs_engelmann.exe nicht gefunden" }
+          Copy-Item $base.FullName dist\demucs-cpp.exe
+          Copy-Item $avx2.FullName dist\demucs-cpp-avx2.exe
           $vcpkgBin = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin"
-          if (Test-Path $vcpkgBin) {
-            Write-Host "Kopiere DLLs aus $vcpkgBin"
-            Get-ChildItem -Path $vcpkgBin -Filter "*.dll" | ForEach-Object {
-              Copy-Item $_.FullName -Destination .
-              Write-Host "  kopiert: $($_.Name)"
-            }
+          Get-ChildItem -Path $vcpkgBin -Filter "*.dll" | ForEach-Object { Copy-Item $_.FullName dist\ }
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Smoke-Test (startet, DLLs vollstaendig)
+        shell: pwsh
+        working-directory: dist
+        run: |
+          foreach ($exe in @(".\demucs-cpp.exe")) {
+            $p = Start-Process $exe -NoNewWindow -Wait -PassThru -RedirectStandardError err.txt
+            $err = Get-Content err.txt -Raw
+            Remove-Item err.txt
+            if ($p.ExitCode -ne 1 -or $err -notmatch "Usage") { throw "$exe startet nicht sauber (exit=$($p.ExitCode)): $err" }
+            Write-Host "$exe OK"
           }
 
-      - name: Upload Binary
+      - name: ZIP + Hashes
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\* -DestinationPath demucs-cpp-win-x64.zip -Force
+          $zip = (Get-FileHash demucs-cpp-win-x64.zip -Algorithm SHA256).Hash.ToLower()
+          $exe = (Get-FileHash dist\demucs-cpp.exe -Algorithm SHA256).Hash.ToLower()
+          $size = (Get-Item demucs-cpp-win-x64.zip).Length
+          @"
+          ### demucs-cpp-win-x64.zip
+          | Feld | Wert |
+          |---|---|
+          | sha256 (ZIP) | ``$zip`` |
+          | exe_sha256 (demucs-cpp.exe) | ``$exe`` |
+          | size | $size |
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Write-Host "sha256=$zip exe_sha256=$exe size=$size"
+
+      - name: Upload
         uses: actions/upload-artifact@v6
         with:
           name: demucs-cpp-win-x64
-          path: |
-            build/**/*.exe
-            build/**/*.dll
+          path: demucs-cpp-win-x64.zip

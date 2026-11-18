@@ -29,7 +29,8 @@ const int OVERLAP_SAMPLES = ::floorf(SAMPLE_RATE * OVERLAP);
 Eigen::Tensor3dXf
 threaded_inference(const struct demucscpp::demucs_model &model,
                    const Eigen::MatrixXf &full_audio, int num_threads,
-                   const std::string &prefix = "")
+                   const std::string &prefix = "",
+                   std::function<void(int, float)> on_progress = nullptr)
 {
     // set output precision to 3 decimal places
     std::cout << std::fixed << std::setprecision(3);
@@ -39,8 +40,15 @@ threaded_inference(const struct demucscpp::demucs_model &model,
     for (int i = 0; i < num_threads; ++i)
     {
         cbs.push_back(
-            [i, prefix](float progress, const std::string &log_message)
+            [i, prefix, on_progress](float progress,
+                                     const std::string &log_message)
             {
+                // Engelmann: optionaler Hook statt Rohausgabe pro Thread
+                if (on_progress)
+                {
+                    on_progress(i, progress);
+                    return;
+                }
                 std::cout << prefix << "[THREAD " << i << "] (" << std::setw(3)
                           << std::setfill(' ') << progress * 100.0f << "%) "
                           << log_message << std::endl;
